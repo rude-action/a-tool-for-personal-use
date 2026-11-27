@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OfflineTube</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #272727;
+    --text: #f1f1f1; --muted: #aaa; --accent: #ff0000; --accent2: #3ea6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+  a { color: inherit; text-decoration: none; }
+  button { cursor: pointer; font-family: inherit; }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 16px;
+    padding: 8px 16px; background: var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  .logo { display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 700; white-space: nowrap; }
+  .logo .play { background: var(--accent); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 16px; }
+  #searchForm { flex: 1; display: flex; max-width: 560px; margin: 0 auto; }
+  #searchInput { flex: 1; background: var(--bg); border: 1px solid #333; border-radius: 20px 0 0 20px;
+    padding: 8px 16px; color: var(--text); font-size: 15px; outline: none; }
+  #searchInput:focus { border-color: var(--accent2); }
+  #searchForm button { background: var(--surface2); border: 1px solid #333; border-left: none;
+    border-radius: 0 20px 20px 0; padding: 0 20px; color: var(--muted); font-size: 15px; }
+  .btn { background: var(--surface2); color: var(--text); border: none; border-radius: 18px;
+    padding: 8px 16px; font-size: 14px; white-space: nowrap; }
+  .btn:hover { filter: brightness(1.2); }
+  .btn.primary { background: var(--accent2); color: #000; font-weight: 600; }
+
+  .layout { display: flex; }
+  /* Sidebar */
+  nav { width: 220px; flex-shrink: 0; padding: 12px 8px; position: sticky; top: 57px;
+    height: calc(100vh - 57px); overflow-y: auto; }
+  nav a { display: flex; align-items: center; gap: 16px; padding: 9px 12px; border-radius: 10px;
+    color: var(--text); font-size: 14px; }
+  nav a:hover, nav a.active { background: var(--surface2); }
+  nav .sec { margin-top: 12px; border-top: 1px solid #333; padding-top: 12px; }
+  nav .label { font-size: 12px; color: var(--muted); padding: 8px 12px; font-weight: 600; }
+
+  main { flex: 1; padding: 20px; min-width: 0; }
+
+  /* Home grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px 14px; }
+  .card { cursor: pointer; }
+  .thumb { position: relative; aspect-ratio: 16/9; background: var(--surface2); border-radius: 12px;
+    overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .thumb img, .thumb video { width: 100%; height: 100%; object-fit: cover; }
+  .thumb .dur { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.8);
+    border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .card .meta { display: flex; gap: 10px; margin-top: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#3ea6ff,#ff0000);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color:#fff; font-size:15px; }
+  .card h3 { font-size: 15px; line-height: 1.35; margin-bottom: 4px; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
+  .empty .big { font-size: 40px; margin-bottom: 12px; }
+
+  /* Watch page */
+  .watch { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+  @media (max-width: 950px) { .watch { grid-template-columns: 1fr; } nav { display: none; } }
+  .player { aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; }
+  .player video { width: 100%; height: 100%; display: block; }
+  .player .fallback { display: flex; height: 100%; align-items: center; justify-content: center;
+    color: var(--muted); flex-direction: column; gap: 10px; }
+  .watch h1 { font-size: 18px; margin: 12px 0 8px; }
+  .watch .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .watch .info { font-size: 13px; color: var(--muted); }
+  .pill { background: var(--surface2); border-radius: 16px; padding: 7px 14px; font-size: 14px; border: none; color: var(--text); }
+  .pill.active { background: var(--accent2); color: #000; font-weight: 600; }
+  .desc { background: var(--surface); border-radius: 12px; padding: 12px; font-size: 14px;
+    margin-top: 14px; white-space: pre-wrap; }
+  .comments { margin-top: 20px; }
+  .comments h2 { font-size: 16px; margin-bottom: 12px; }
+  .comment { display: flex; gap: 10px; margin-bottom: 14px; }
+  .comment .body { font-size: 14px; }
+  .comment .who { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .cinput { display: flex; gap: 10px; margin-bottom: 18px; }
+  .cinput input { flex: 1; background: transparent; border: none; border-bottom: 1px solid #444;
+    padding: 8px 2px; color: var(--text); font-size: 14px; outline: none; }
+  .cinput input:focus { border-color: var(--text); }
+  .sidebar h3 { font-size: 15px; margin-bottom: 10px; }
+  .scard { display: flex; gap: 8px; margin-bottom: 10px; cursor: pointer; }
+  .scard .thumb { width: 160px; flex-shrink: 0; aspect-ratio: 16/9; border-radius: 8px; }
+  .scard h4 { font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .scard .sub { font-size: 12px; color: var(--muted); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none;
+    align-items: center; justify-content: center; z-index: 100; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 14px; padding: 22px; width: 420px; max-width: 92vw; }
+  .modal h2 { font-size: 18px; margin-bottom: 16px; }
+  .modal label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  .modal input[type=text], .modal textarea { width: 100%; background: var(--bg); border: 1px solid #333;
+    border-radius: 8px; padding: 9px 10px; color: var(--text); font-size: 14px; outline: none; font-family: inherit; }
+  .modal textarea { min-height: 70px; resize: vertical; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .dropzone { border: 2px dashed #444; border-radius: 10px; padding: 22px; text-align: center;
+    color: var(--muted); font-size: 14px; cursor: pointer; }
+  .dropzone.over { border-color: var(--accent2); color: var(--accent2); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface2); padding: 10px 20px; border-radius: 20px; font-size: 14px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 200; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="#" onclick="go('home');return false" class="logo"><span class="play">▶</span>OfflineTube</a>
+  <form id="searchForm">
+    <input id="searchInput" placeholder="Search videos" autocomplete="off">
+    <button type="submit">🔍</button>
+  </form>
+  <button class="btn primary" onclick="openUpload()">＋ Add Video</button>
+</header>
+
+<div class="layout">
+  <nav>
+    <a href="#" data-nav="home" onclick="go('home');return false">🏠 Home</a>
+    <a href="#" data-nav="trending" onclick="go('trending');return false">🔥 Trending</a>
+    <a href="#" data-nav="liked" onclick="go('liked');return false">👍 Liked</a>
+    <a href="#" data-nav="history" onclick="go('history');return false">🕒 History</a>
+    <div class="sec">
+      <div class="label">CHANNELS</div>
+      <div id="navChannels"></div>
+    </div>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<!-- Upload modal -->
+<div class="modal-bg" id="uploadModal">
+  <div class="modal">
+    <h2>Add a Video</h2>
+    <div class="dropzone" id="dropzone">Click or drag a video file here<br><small>mp4, webm, etc. — stays on your device</small></div>
+    <input type="file" id="fileInput" accept="video/*" hidden>
+    <div id="uploadMeta" style="display:none">
+      <label>Title</label>
+      <input type="text" id="vTitle" maxlength="100">
+      <label>Channel name</label>
+      <input type="text" id="vChannel" maxlength="50" value="You">
+      <label>Description</label>
+      <textarea id="vDesc"></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="closeUpload()">Cancel</button>
+      <button class="btn primary" id="publishBtn" onclick="publish()" disabled>Upload</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const LS_KEY = "offlinetube.v1";
+let db = JSON.parse(localStorage.getItem(LS_KEY) || "null") || {
+  videos: [], comments: {}, likes: {}, history: [], views: {}, liked: {}
+};
+let sessionFiles = {}; // id -> object URL (valid this session only)
+let route = { page: "home", param: "" };
+let pendingFile = null;
+
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtViews(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+"M" : n >= 1e3 ? (n/1e3).toFixed(1)+"K" : String(n); }
+function ago(ts) {
+  const s = (Date.now()-ts)/1000;
+  if (s < 60) return "just now";
+  const units = [[60,"minute"],[60,"hour"],[24,"day"],[7,"week"],[4.35,"month"],[12,"year"]];
+  let v = s, name = "second";
+  for (const [f,n] of units) { if (v < f) break; v /= f; name = n; }
+  v = Math.floor(v); return `${v} ${name}${v!==1?"s":""} ago`;
+}
+function fmtDur(sec) {
+  sec = Math.round(sec||0);
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  return (h?h+":":"") + String(m).padStart(h?2:1,"0") + ":" + String(s).padStart(2,"0");
+}
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+function fileAvailable(id) { return !!sessionFiles[id]; }
+function srcFor(v) {
+  if (sessionFiles[v.id]) return sessionFiles[v.id];
+  return null;
+}
+
+/* ---------- routing ---------- */
+function go(page, param="") {
+  route = { page, param };
+  document.querySelectorAll("nav a").forEach(a =>
+    a.classList.toggle("active", a.dataset.nav === page));
+  if (page === "watch") { /* history handled on render */ }
+  render();
+  window.scrollTo(0,0);
+}
+function render() {
+  const m = document.getElementById("main");
+  if (route.page === "home") renderGrid(m, db.videos, "Recommended");
+  else if (route.page === "trending") renderGrid(m, [...db.videos].sort((a,b)=>(db.views[b.id]||0)-(db.views[a.id]||0)), "Trending");
+  else if (route.page === "liked") renderGrid(m, db.videos.filter(v=>db.liked[v.id]), "Liked videos");
+  else if (route.page === "history") renderGrid(m, db.history.map(id=>db.videos.find(v=>v.id===id)).filter(Boolean).reverse(), "Watch history");
+  else if (route.page === "search") renderGrid(m, db.videos.filter(v =>
+      (v.title+" "+v.channel+" "+v.desc).toLowerCase().includes(route.param.toLowerCase())),
+      `Results for "${esc(route.param)}"`);
+  else if (route.page === "channel") renderGrid(m, db.videos.filter(v=>v.channel===route.param), route.param);
+  else if (route.page === "watch") renderWatch(m, route.param);
+  renderNavChannels();
+}
+
+function renderNavChannels() {
+  const chans = [...new Set(db.videos.map(v=>v.channel))];
+  document.getElementById("navChannels").innerHTML = chans.map(c =>
+    `<a href="#" onclick="go('channel','${esc(c).replace(/'/g,"\\'")}');return false">
+      <span class="avatar" style="width:24px;height:24px;font-size:11px">${esc(c[0].toUpperCase())}</span>${esc(c)}</a>`).join("");
+}
+
+function cardHTML(v) {
+  const avail = fileAvailable(v.id);
+  const views = db.views[v.id] || 0;
+  return `<div class="card" onclick="go('watch','${v.id}')">
+    <div class="thumb">${avail
+      ? `<video src="${srcFor(v)}#t=2" muted preload="metadata"></video><span class="dur">${fmtDur(v.dur)}</span>`
+      : `<div style="padding:10px;text-align:center;font-size:13px">📁 Re-add file to play<br><small>${esc(v.filename||"")}</small></div>`}
+    </div>
+    <div class="meta">
+      <div class="avatar">${esc(v.channel[0].toUpperCase())}</div>
+      <div style="min-width:0">
+        <h3>${esc(v.title)}</h3>
+        <div class="sub">${esc(v.channel)}<br>${fmtViews(views)} views • ${ago(v.ts)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderGrid(m, list, title) {
+  m.innerHTML = `<h2 style="margin-bottom:16px">${title}</h2>` +
+    (list.length ? `<div class="grid">${list.map(cardHTML).join("")}</div>`
+     : `<div class="empty"><div class="big">📼</div>No videos yet.<br>Click <b>＋ Add Video</b> to upload one from your device.</div>`);
+}
+
+function renderWatch(m, id) {
+  const v = db.videos.find(x=>x.id===id);
+  if (!v) { m.innerHTML = `<div class="empty">Video not found.</div>`; return; }
+
+  // track view + history
+  db.views[id] = (db.views[id]||0) + 1;
+  db.history = db.history.filter(h=>h!==id); db.history.push(id);
+  if (db.history.length > 100) db.history.shift();
+  save();
+
+  const src = srcFor(v);
+  const liked = !!db.liked[id];
+  const comments = db.comments[id] || [];
+  const related = db.videos.filter(x=>x.id!==id)
+    .sort((a,b)=>(b.channel===v.channel)-(a.channel===v.channel));
+
+  m.innerHTML = `<div class="watch">
+    <div>
+      <div class="player">${src
+        ? `<video src="${src}" controls autoplay></video>`
+        : `<div class="fallback"><span style="font-size:34px">📁</span>Video file not loaded in this session.<br>
+           <small>Re-add the file via <b>＋ Add Video</b> (same file) to restore playback.</small></div>`}
+      </div>
+      <h1>${esc(v.title)}</h1>
+      <div class="row">
+        <div class="avatar">${esc(v.channel[0].toUpperCase())}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">${esc(v.channel)}</div>
+          <div class="info">${fmtViews(db.views[id]||0)} views • ${ago(v.ts)}</div>
+        </div>
+        <button class="pill ${liked?'active':''}" id="likeBtn" onclick="toggleLike('${id}')">
+          👍 ${fmtVotes(id)}</button>
+        <button class="pill" onclick="deleteVideo('${id}')">🗑 Delete</button>
+      </div>
+      <div class="desc">${esc(v.desc || "No description.")}</div>
+      <div class="comments">
+        <h2>${comments.length} Comments</h2>
+        <div class="cinput">
+          <input id="commentInput" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')addComment('${id}')">
+          <button class="btn" onclick="addComment('${id}')">Comment</button>
+        </div>
+        ${comments.slice().reverse().map(c=>`<div class="comment">
+          <div class="avatar" style="width:30px;height:30px;font-size:12px">${esc(c.who[0].toUpperCase())}</div>
+          <div><div class="who">@${esc(c.who)} • ${ago(c.ts)}</div><div class="body">${esc(c.text)}</div></div>
+        </div>`).join("") || `<div class="info">No comments yet.</div>`}
+      </div>
+    </div>
+    <div class="sidebar">
+      <h3>Up next</h3>
+      ${related.map(r=>`<div class="scard" onclick="go('watch','${r.id}')">
+        <div class="thumb">${fileAvailable(r.id)
+          ? `<video src="${srcFor(r)}#t=2" muted preload="metadata"></video><span class="dur">${fmtDur(r.dur)}</span>`
+          : "📁"}</div>
+        <div style="min-width:0"><h4>${esc(r.title)}</h4>
+        <div class="sub">${esc(r.channel)}<br>${fmtViews(db.views[r.id]||0)} views</div></div>
+      </div>`).join("") || `<div class="info">Nothing else here yet.</div>`}
+    </div>
+  </div>`;
+}
+function fmtVotes(id) { const n = db.likes[id]||0; return n ? fmtViews(n) : "Like"; }
+function toggleLike(id) {
+  if (db.liked[id]) { delete db.liked[id]; db.likes[id] = Math.max(0,(db.likes[id]||1)-1); }
+  else { db.liked[id] = true; db.likes[id] = (db.likes[id]||0)+1; }
+  save(); render();
+}
+function addComment(id) {
+  const inp = document.getElementById("commentInput");
+  const text = inp.value.trim();
+  if (!text) return;
+  (db.comments[id] = db.comments[id]||[]).push({ who:"you", text, ts:Date.now() });
+  save(); render();
+}
+function deleteVideo(id) {
+  if (!confirm("Delete this video (and its comments)?")) return;
+  db.videos = db.videos.filter(v=>v.id!==id);
+  delete db.comments[id]; delete db.likes[id]; delete db.views[id]; delete db.liked[id];
+  db.history = db.history.filter(h=>h!==id);
+  if (sessionFiles[id]) { URL.revokeObjectURL(sessionFiles[id]); delete sessionFiles[id]; }
+  save(); go("home");
+}
+
+/* ---------- upload ---------- */
+const modal = document.getElementById("uploadModal"),
+      dz = document.getElementById("dropzone"),
+      fileInput = document.getElementById("fileInput");
+function openUpload() { modal.classList.add("open"); resetUpload(); }
+function closeUpload() { modal.classList.remove("open"); }
+function resetUpload() {
+  pendingFile = null; fileInput.value = "";
+  document.getElementById("uploadMeta").style.display = "none";
+  document.getElementById("publishBtn").disabled = true;
+  dz.style.display = "";
+  document.getElementById("vTitle").value = "";
+  document.getElementById("vDesc").value = "";
+}
+dz.onclick = () => fileInput.click();
+dz.ondragover = e => { e.preventDefault(); dz.classList.add("over"); };
+dz.ondragleave = () => dz.classList.remove("over");
+dz.ondrop = e => { e.preventDefault(); dz.classList.remove("over"); pickFile(e.dataTransfer.files[0]); };
+fileInput.onchange = () => pickFile(fileInput.files[0]);
+function pickFile(f) {
+  if (!f) return;
+  if (!f.type.startsWith("video/")) { toast("Please choose a video file"); return; }
+  pendingFile = f;
+  document.getElementById("vTitle").value = f.name.replace(/\.[^.]+$/, "");
+  document.getElementById("uploadMeta").style.display = "";
+  document.getElementById("publishBtn").disabled = false;
+  dz.style.display = "none";
+}
+function publish() {
+  if (!pendingFile) return;
+  const id = "v" + Date.now() + Math.random().toString(36).slice(2,6);
+  // probe duration via temp element
+  const url = URL.createObjectURL(pendingFile);
+  sessionFiles[id] = url;
+  const probe = document.createElement("video");
+  probe.preload = "metadata"; probe.src = url;
+  const finish = dur => {
+    db.videos.push({
+      id, title: document.getElementById("vTitle").value.trim() || "Untitled",
+      channel: document.getElementById("vChannel").value.trim() || "You",
+      desc: document.getElementById("vDesc").value.trim(),
+      ts: Date.now(), dur: dur || 0, filename: pendingFile.name
+    });
+    save(); closeUpload(); toast("Video added to your library");
+    go("watch", id);
+  };
+  probe.onloadedmetadata = () => finish(probe.duration);
+  probe.onerror = () => finish(0);
+}
+modal.addEventListener("click", e => { if (e.target === modal) closeUpload(); });
+
+/* ---------- search ---------- */
+document.getElementById("searchForm").onsubmit = e => {
+  e.preventDefault();
+  const q = document.getElementById("searchInput").value.trim();
+  if (q) go("search", q);
+};
+
+render();
+</script>
+</body>
+</html>
